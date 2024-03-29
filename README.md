@@ -15,14 +15,14 @@
   </p>
 </div>
 
-#### Useful ingo
+#### Useful info:
 Install [pongo](https://github.com/Kong/kong-pongo)
 
 `pongo run` - to run plugin unit tests
 
 `pongo pack` - to pack plugin files into a `.rock` file
 
-place inigo_ffi files into `kong.plugins/inigo` folder:
+place *inigo_ffi* files into `kong.plugins/inigo` folder:
 ```
 handler.lua
 schema.lua
