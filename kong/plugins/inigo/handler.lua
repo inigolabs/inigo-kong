@@ -247,6 +247,15 @@ function InigoPlugin:access(plugin_conf)
   print("====================== InigoPlugin:access END =======================")
 end --]]
 
+function InigoPlugin:header_filter()
+  if not self.handle_ptr then return end
+  if not kong.request.instance or tonumber(kong.request.instance) == 0 then
+    print("request handle was not found")
+    return
+  end
+  -- clear Content-Length in case body will be changed
+  kong.response.clear_header("Content-Length")
+end
 
 -- runs in the 'body_filter_by_lua_block'
 function InigoPlugin:body_filter(plugin_conf)
@@ -280,14 +289,14 @@ function InigoPlugin:body_filter(plugin_conf)
   local typeint_ptr_size = ffi.sizeof(typeint_ptr)
 
   local output = ffi.cast(typechar_ptr, ffi.C.malloc(typechar_ptr_size))
-
   local output_len = ffi.cast(typeint_ptr, ffi.C.malloc(typeint_ptr_size))
 
-  local size_before = tonumber(output_len[0])
-
+  -- print("Received Body: ", resp_len , " | ", resp_body)
   self.libinigo.process_response(self.handle_ptr, kong.request.instance, body, body_len, output, output_len)
+
   local size_after = tonumber(output_len[0])
   local raw_body = ffi.string(output[0], size_after)
+  -- print("Processed Body: ", size_after , " | ", raw_body)
 
   local last_error = ffi.string(self.libinigo.check_lasterror())
   if last_error == "" then
@@ -295,7 +304,8 @@ function InigoPlugin:body_filter(plugin_conf)
   else 
     print("Inigo process_response fail: ", tostring(last_error))
     end
-    if raw_body ~= "" then kong.response.set_raw_body(raw_body) end
+    resp_body = transform_response(raw_body)
+    if resp_body then kong.response.set_raw_body(raw_body) end
 
     self.libinigo.disposeMemory(output)
 
