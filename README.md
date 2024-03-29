@@ -1,7 +1,7 @@
 <br />
 <div align="center">
-  <img src="/assets/inigo.svg">
-  <img height="25" src="/assets/lua.svg">
+  <img src="./assets/inigo.svg">
+  <img height="40" src="./assets/lua.svg">
   <p align="center">
     GraphQL for Platform Teams
     <br />
@@ -15,11 +15,28 @@
   </p>
 </div>
 
+#### Useful ingo
+Install [pongo](https://github.com/Kong/kong-pongo)
+
+`pongo run` - to run plugin unit tests
+
+`pongo pack` - to pack plugin files into a `.rock` file
+
+place inigo_ffi files into `kong.plugins/inigo` folder:
+```
+handler.lua
+schema.lua
+inigo_linux_native
+inigo_linux_amd64       
+inigo_linux_arm64
+```
+
 ### @TODO
 
-- [ ] create libinigo ffi instance for each worker, to be able to run goroutines
 - [ ] figure out how to pass path to libffi file (currently done with the use of `BASE_PATH` env variable)
-- [ ] implement `modify_response` function
+- [ ] implement schema update
+- [ ] implement any other missing functionallity
+- [ ] check for memory leaks
 - [ ] implement plugin schema (config structure)
 - [ ] set up CI and github tests
 - [ ] set up plugin publishing via luarocks package manager

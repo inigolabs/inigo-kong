@@ -13,8 +13,6 @@
 local ffi = require("ffi")
 local cjson = require "cjson"
 
-print("====================== INIT START =======================")
-
 local function getArch() 
   local arch = ffi.arch
   if (arch == "x64") then return "amd64" end
@@ -42,16 +40,11 @@ print("ARCH: ", ffi.arch, " => ", getArch())
 
 local pf = "inigo_" .. getOS() .. "_" .. getArch()
 local ext = getExt()
-
 local libPath = pf .. "/libinigo" .. ext
 
-print("load file: ", libPath)
 -- @TODO - figure out better way to get path to lifffi .so file
 local base_path = os.getenv("LIBFFI_BASE_PATH")
-if not base_path then base_path = "/usr/local/bin/inigo/" end -- /kong-plugin/
-print("load file path: ", base_path .. "kong/plugins/inigo/" .. libPath)
-local libinigo = ffi.load(base_path .. "kong/plugins/inigo/" .. libPath)
-print("====================== INIT END =======================")
+if not base_path then base_path = "/" end -- /usr/local/bin/inigo/
 
 ffi.cdef[[
   typedef size_t GoUintptr;
@@ -85,10 +78,6 @@ ffi.cdef[[
   // void free(void *);
 ]]
 
-local version_ptr = libinigo.get_version()
-  
-print("Inigo version: ", ffi.string(version_ptr))
-
 local InigoPlugin = {
   PRIORITY = 1000, -- set the plugin priority, which determines plugin execution order
   VERSION = "0.1", -- version in X.Y.Z format. Check hybrid-mode compatibility requirements.
@@ -98,29 +87,9 @@ local InigoPlugin = {
 -- before worker processes are forked. So anything you add here will run once,
 -- but be available in all workers.
 
+-- if not InigoPlugin.handle_ptr then InigoPlugin.handle_ptr = libinigo.create(cfg) end
 
-print("====================== create START =======================")
-local new_cfg = ffi.typeof("Config")
-local cfg = new_cfg()
--- print("TOKEN: ",  os.getenv("INIGO_SERVICE_TOKEN"))
-cfg.token = ffi.cast("char*", os.getenv("INIGO_SERVICE_TOKEN"))
-cfg.service = ffi.cast("char*", os.getenv("INIGO_SERVICE_URL"))
-cfg.egressUrl = ffi.cast("char*", os.getenv("INIGO_EGRESS_URL"))
-cfg.debug = ffi.cast("int8_t", 1)
-cfg.name = ffi.cast("char*", "unittest")
-cfg.runtime = ffi.cast("char*", "kong-lua")
-
-if not InigoPlugin.handle_ptr then InigoPlugin.handle_ptr = libinigo.create(cfg) end
-
-if not InigoPlugin.handle_ptr then
-  print("Inigo lib init failed:", ffi.string(libinigo.check_lasterror()))
-else 
-  print("Inigo lib initialized succesfully: ", tonumber(InigoPlugin.handle_ptr))
-  end
-print("====================== create END =======================")
-
-
-local function modify_request(req, status)
+local function transform_request(req, status)
   print("====================== modify_request START =======================")
   print("req: '", req, "' | status: '", status, "' ")
   local data = nil
@@ -137,11 +106,11 @@ local function modify_request(req, status)
   return data, status_code
 end
 
--- @TODO - implement modify_response
-local function modify_response(resp)
+-- @TODO - probably we don't need this
+local function transform_response(resp)
   print("====================== modify_response START =======================")
   print(resp)
-  local data = {}
+  local data = nil
   if resp ~= "" then
     local status, err = pcall(function() data = cjson.decode(resp) end) 
     if err then
@@ -150,15 +119,40 @@ local function modify_response(resp)
     kong.log.inspect(data)
   end
   print("====================== modify_response END =======================")
+  return data
 end
 
-
+local token = os.getenv("INIGO_SERVICE_TOKEN")
+local service_url = os.getenv("INIGO_SERVICE_URL")
+local egress_url = os.getenv("INIGO_EGRESS_URL")
 -- handles more initialization, but AFTER the worker process has been forked/created.
 -- It runs in the 'init_worker_by_lua_block'
+print("load file path: ", base_path .. "kong/plugins/inigo/" .. libPath)
+
 function InigoPlugin:init_worker()
   print("====================== init_worker START =======================")
-  -- libinigo.create does not work inside forked() worker
-  -- self.handle_ptr = libinigo.create(cfg)
+  local new_cfg = ffi.typeof("Config")
+  local cfg = new_cfg()
+  cfg.token = ffi.cast("char*", token)
+  cfg.service = ffi.cast("char*", service_url)
+  cfg.egressUrl = ffi.cast("char*", egress_url)
+  cfg.debug = ffi.cast("int8_t", 1)
+  cfg.name = ffi.cast("char*", "kong ".. kong.version)
+  cfg.runtime = ffi.cast("char*", string.lower(_VERSION))
+
+  self.libinigo = ffi.load(base_path .. "kong/plugins/inigo/" .. libPath)
+  local version_ptr = self.libinigo.get_version()
+  
+  print("Inigo version: ", ffi.string(version_ptr))
+  print("runtime: ", ffi.string(cfg.name), " : ", ffi.string(cfg.runtime), " |")
+
+  self.handle_ptr = self.libinigo.create(cfg)
+  if not self.handle_ptr then
+    print("Inigo lib init failed:", ffi.string(self.libinigo.check_lasterror()))
+  else 
+    print("Inigo lib initialized succesfully: ", tonumber(self.handle_ptr))
+    end
+
   print("====================== init_worker END =======================")
 end --]]
 
@@ -214,7 +208,7 @@ function InigoPlugin:access(plugin_conf)
   local size_before = tonumber(output_len[0])
   local status_size_before = tonumber(status_len[0])
 
-  kong.request.instance = libinigo.process_service_request(
+  kong.request.instance = self.libinigo.process_service_request(
     self.handle_ptr,
     schema,
     schema_len,
@@ -238,17 +232,15 @@ function InigoPlugin:access(plugin_conf)
     status_str = ffi.string(status[0], status_size_after)
   end
 
-  print("OUTPUT: ", output_str, " |")
-  print("STATUS: ", status_str, " |")
-  local req_body, req_status = modify_request(output_str, status_str)
+  local req_body, req_status = transform_request(output_str, status_str)
   if kong.request.instance then
     print("Inigo process_request succesfully: ", tonumber(kong.request.instance))
   else 
-    print("Inigo process_request failed:", ffi.string(libinigo.check_lasterror()))
+    print("Inigo process_request failed:", ffi.string(self.libinigo.check_lasterror()))
     end
-  print("output: ", tonumber(output_len), " | status: ", tonumber(status_len))
-  libinigo.disposeMemory(output)
-  libinigo.disposeMemory(status)
+  
+  self.libinigo.disposeMemory(output)
+  self.libinigo.disposeMemory(status)
 
   if req_body ~= nil then kong.response.exit(req_status, req_body) end
 
@@ -264,13 +256,15 @@ function InigoPlugin:body_filter(plugin_conf)
     return
   end
 
+  local resp_body = kong.response.get_raw_body()
+  -- print('RESP body: ', resp_body)
+  local resp_len = 0
+    -- continue only when full body is available
+  if resp_body == "" or not resp_body then return end
+
   print("====================== InigoPlugin:body_filter START =======================")
 
   print("running :body_filter with instance: ", tonumber(kong.request.instance))
-  -- your custom code here
-  local resp_body = kong.response.get_raw_body()
-  -- print('RESP body: ', resp_body)
-  local resp_len = 2
 
   local body = ffi.cast("char*", "")
   if resp_body then 
@@ -278,8 +272,6 @@ function InigoPlugin:body_filter(plugin_conf)
     resp_len = tostring(resp_body):len()
   end
   local body_len = ffi.cast("GoInt", resp_len)
-
-  print('Response body: ', ffi.string(body), " | len: ", tonumber(body_len))
 
   local typechar_ptr = ffi.typeof("char**")
   local typechar_ptr_size = ffi.sizeof(typechar_ptr)
@@ -293,31 +285,27 @@ function InigoPlugin:body_filter(plugin_conf)
 
   local size_before = tonumber(output_len[0])
 
-  libinigo.process_response(self.handle_ptr, kong.request.instance, body, body_len, output, output_len)
+  self.libinigo.process_response(self.handle_ptr, kong.request.instance, body, body_len, output, output_len)
   local size_after = tonumber(output_len[0])
-  print("RESPONSE: ", size_before, " => ", size_after, " |")
+  local raw_body = ffi.string(output[0], size_after)
 
-  print("output LEN: ", size_after, " | ")
-
-  print("output STR: '", ffi.string(output[0], size_after), "' | ")
-  if size_after ~= size_before then
-    modify_response(ffi.string(output[0], size_after))
-  end
-  local last_error = ffi.string(libinigo.check_lasterror())
+  local last_error = ffi.string(self.libinigo.check_lasterror())
   if last_error == "" then
     print("Inigo process_response success:")
   else 
     print("Inigo process_response fail: ", tostring(last_error))
     end
+    if raw_body ~= "" then kong.response.set_raw_body(raw_body) end
 
-    libinigo.disposeMemory(output)
+    self.libinigo.disposeMemory(output)
+
     print("====================== InigoPlugin:body_filter END =======================")
 
 end
 
 function InigoPlugin:log()
   if not self.handle_ptr then return end
-  if kong.request.instance then libinigo.disposeHandle(kong.request.instance) end
+  if kong.request.instance then self.libinigo.disposeHandle(kong.request.instance) end
 end
 
 -- return inigo plugin object
