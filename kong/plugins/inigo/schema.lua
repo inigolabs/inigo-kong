@@ -13,12 +13,7 @@ local schema = {
         -- The 'config' record is the custom part of the plugin schema
         type = "record",
         fields = {
-          {
-            schema = {
-              type = "string",
-              required = false
-            }
-          },
+          { schema = { type = "string", required = false } },
           { path = typedefs.path { required = false } }
         },
         entity_checks = {
