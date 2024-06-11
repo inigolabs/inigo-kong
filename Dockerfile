@@ -1,26 +1,17 @@
-FROM kong/kong-gateway:latest
+# image is based on https://docs.konghq.com/gateway/latest/plugin-development/distribution/#via-a-dockerfile-or-docker-run-install-and-load
+FROM kong/kong-gateway:3.7.0.0
 
 # Ensure any patching steps are executed as root user
 USER root
 
-RUN apt update
-RUN apt install unzip
-
 # Add custom plugin to the image
 COPY kong-plugin-inigo-0.1.0-1.all.rock .
-
-COPY kong/plugins/inigo/inigo_linux_amd64 /kong/plugins/inigo/inigo_linux_amd64
-
-COPY kong.yml .
-
-ENV KONG_DECLARATIVE_CONFIG=kong.yml
-
+RUN apt-get update; apt-get install unzip
+RUN luarocks install kong-plugin-inigo-0.1.0-1.all.rock
 ENV KONG_PLUGINS=bundled,inigo
 
-ENV LOG_LEVEL=DEBUG
-ENV KONG_DATABASE=off
-
-RUN luarocks install kong-plugin-inigo-0.1.0-1.all.rock
+# add inigo lib
+COPY libs /kong/plugins/inigo
 
 # Ensure kong user is selected for image execution
 USER kong
