@@ -205,6 +205,8 @@ function inigo:body_filter(plugin_conf)
   local typeint_ptr_size = ffi.sizeof(typeint_ptr)
   local response_len = ffi.cast(typeint_ptr, ffi.C.malloc(typeint_ptr_size))
 
+  local response_len_before = tonumber(response_len[0])
+
   self.libinigo.process_response(
     self.handle_ptr,
     kong.request.instance,
@@ -213,8 +215,10 @@ function inigo:body_filter(plugin_conf)
   )
 
   local resp_size = tonumber(response_len[0])
-  local raw_body = ffi.string(response[0], resp_size)
-  kong.response.set_raw_body(raw_body)
+  if response_len_before ~= resp_size then
+    local raw_body = ffi.string(response[0], resp_size)
+    kong.response.set_raw_body(raw_body)
+  end
 
   self.libinigo.disposeMemory(response)
   self.libinigo.disposeMemory(response_len)
