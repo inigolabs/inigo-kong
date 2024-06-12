@@ -12,7 +12,7 @@ for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" then
     helpers.setenv("INIGO_STORAGE_URL", "http://192.168.49.2:30020/query")
     helpers.setenv("INIGO_DEPLOYMENT_ENV", "mini")
     helpers.setenv("INIGO_EGRESS_URL", "http://192.168.49.2:30007/query")
-    helpers.setenv("LIBFFI_BASE_PATH", "/kong-plugin/") -- path inside pongo container
+    helpers.setenv("INIGO_LIB_BASE_PATH", "/kong-plugin/") -- path inside pongo container
 
     lazy_setup(function()
       local bp = helpers.get_db_utils(strategy == "off" and "postgres" or strategy, nil, { PLUGIN_NAME })

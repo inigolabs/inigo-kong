@@ -2,7 +2,8 @@
 servroot
 
 # packed distribution format for LuaRocks
-*.rock
+# *.rock
+
 # exclude Pongo shell history
 .pongo/.ash_history
 .pongo/.bash_history
@@ -12,3 +13,8 @@ luacov.stats.out
 luacov.report.out
 # exclude Pongo containerid file
 .containerid
+
+.DS_Store
+.idea
+
+libs
