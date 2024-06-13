@@ -27,15 +27,14 @@ ffi.cdef[[
   extern GoUint8 update_schema(GoUintptr handlePtr, char* input, GoInt input_len);
 
   extern void disposeHandle(GoUintptr handlePtr);
-  extern void disposeMemory(void* ptr);
 
   void *malloc(size_t);
-  // void free(void *);
 ]]
 
 local inigo = {
-  PRIORITY = 1000, -- set the plugin priority, which determines plugin execution order
-  VERSION = "0.1", -- version in X.Y.Z format. Check hybrid-mode compatibility requirements.
+  -- priority determines plugin execution order, see https://docs.konghq.com/gateway/3.7.x/plugin-development/custom-logic/#plugins-execution-order
+  PRIORITY = 1000,
+  VERSION = "0.30.3",
 }
 
 local function getArch()
@@ -82,8 +81,6 @@ local full_path = base_path .. "kong/plugins/inigo/" .. lib_path
 kong.log.debug("inigo : inigo lib path - ", full_path, ", os - ", ffi.os, ", arch - ", ffi.arch)
 
 local token = os.getenv("INIGO_SERVICE_TOKEN")
-local service_url = os.getenv("INIGO_SERVICE_URL")
-local egress_url = os.getenv("INIGO_EGRESS_URL")
 
 -- create Inigo instance (after the worker process has been forked)
 function inigo:init_worker()
@@ -92,9 +89,6 @@ function inigo:init_worker()
   -- create config
   local cfg = ffi.typeof("Config")()
   cfg.token = ffi.cast("char*", token)
-  cfg.service = ffi.cast("char*", service_url)
-  cfg.egressUrl = ffi.cast("char*", egress_url)
-  cfg.debug = ffi.cast("int8_t", 1)
   cfg.name = ffi.cast("char*", "kong ".. kong.version)
   cfg.runtime = ffi.cast("char*", string.lower(_VERSION))
 
@@ -167,9 +161,6 @@ function inigo:access(plugin_conf)
     kong.response.exit(200, output_str)
   end
 
-  self.libinigo.disposeMemory(output)
-  self.libinigo.disposeMemory(status)
-
   kong.log.debug("process_request : end")
 end
 
@@ -219,9 +210,6 @@ function inigo:body_filter(plugin_conf)
     local raw_body = ffi.string(response[0], resp_size)
     kong.response.set_raw_body(raw_body)
   end
-
-  self.libinigo.disposeMemory(response)
-  self.libinigo.disposeMemory(response_len)
 
   kong.log.debug("process_response : end")
 end
