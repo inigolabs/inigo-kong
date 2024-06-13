@@ -156,7 +156,7 @@ function inigo:access(plugin_conf)
   -- mutate request : if request is mutated by Inigo
   local status_size = tonumber(status_len[0])
   if status_size ~= status_size_before then
-    local status_str = ffi.string(status[0], status_size)
+    local status_str = ffi.string(status[0], status_size) -- luacheck: no unused
     -- TODO: mutate request
   end
 
