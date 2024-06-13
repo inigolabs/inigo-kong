@@ -1,24 +1,19 @@
 local typedefs = require "kong.db.schema.typedefs"
 
-local PLUGIN_NAME = "inigo"
-
--- @TODO - implement schema
 local schema = {
-  name = PLUGIN_NAME,
+  name = "inigo",
   fields = {
-    -- the 'fields' array is the top-level entry with fields defined by Kong
-    { consumer = typedefs.no_consumer },  -- this plugin cannot be configured on a consumer (typical for auth plugins)
+    -- this plugin cannot be configured on a consumer (typical for auth plugins)
+    { consumer = typedefs.no_consumer },
+
+    -- this plugin will only run within Nginx HTTP module
     { protocols = typedefs.protocols_http },
+
+    -- plugin specific configuration (configuration description that will appear in the Kong Konnect UI)
     { config = {
-        -- The 'config' record is the custom part of the plugin schema
         type = "record",
-        fields = {
-          { schema = { type = "string", required = false } },
-          { path = typedefs.path { required = false } }
-        },
-        entity_checks = {
-          -- add some validation rules across fields
-        },
+        fields = {},
+        entity_checks = {},
       },
     },
   },
