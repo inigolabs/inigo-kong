@@ -17,8 +17,9 @@ jobs:
       - name: LuaCheck linter
         uses: lunarmodules/luacheck@master
 
-      - uses: Kong/kong-pongo-action@v1.0.2
-        with:
-          kong_version: ${{ matrix.kong_version }}
-
-      - run: pongo run -- --Xoutput "--color"
+# uncomment when UTs are added
+#      - uses: Kong/kong-pongo-action@v1.0.2
+#        with:
+#          kong_version: ${{ matrix.kong_version }}
+#
+#      - run: pongo run -- --Xoutput "--color"
