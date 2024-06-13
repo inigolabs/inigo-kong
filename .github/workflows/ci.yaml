@@ -1,0 +1,24 @@
+name: "Continuous Integration"
+on: [push]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        kong_version:
+          - "3.7.x"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: LuaCheck linter
+        uses: lunarmodules/luacheck@master
+
+      - uses: Kong/kong-pongo-action@v1.0.2
+        with:
+          kong_version: ${{ matrix.kong_version }}
+
+      - run: pongo run -- --Xoutput "--color"
