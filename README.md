@@ -15,36 +15,9 @@
   </p>
 </div>
 
-#### Useful info:
-Install [pongo](https://github.com/Kong/kong-pongo)
-
-`pongo run` - to run plugin unit tests
-
-`pongo pack` - to pack plugin files into a `.rock` file
-
-place *inigo_ffi* files into `kong.plugins/inigo` folder:
-```
-handler.lua
-schema.lua
-inigo_linux_native
-inigo_linux_amd64       
-inigo_linux_arm64
-```
-
-### @TODO
-
-- [ ] figure out how to pass path to libffi file (currently done with the use of `BASE_PATH` env variable)
-- [ ] implement schema update
-- [ ] implement any other missing functionallity
-- [ ] check for memory leaks
-- [ ] implement plugin schema (config structure)
-- [ ] set up CI and github tests
-- [ ] set up plugin publishing via luarocks package manager
-- [ ] write more tests :)
-
 ### Overview
 Gain instant monitoring and protection into GraphQL APIs. Unblock platform teams and accelerate GraphQL adoption.
-Inigo's platform integration offers GraphQL Security, Analytics, Rate-limiting, Access Control and more.  
+Inigo's platform integration offers GraphQL Security, Analytics, Rate-limiting, Access Control and more.
 
 This package is the Inigo plugin for Ruby servers.
 
@@ -55,7 +28,7 @@ This package is the Inigo plugin for Ruby servers.
 
 ### Docker image
 
-1. Download inigo libs from https://github.com/inigolabs/artifacts/releases/latest and put them to the libs folder in the root of this repo. Example:
+1. Download inigo libs from https://github.com/inigolabs/artifacts/releases/latest and put them in the libs folder in the root of this repo. Example:
 
 ```
 inigo-linux-amd64.so -> inigo-kong/libs/inigo_linux_amd64/libinigo.so
