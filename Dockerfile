@@ -10,9 +10,6 @@ RUN apt-get update; apt-get install unzip
 RUN luarocks install kong-plugin-inigo-0.1.0-1.all.rock
 ENV KONG_PLUGINS=bundled,inigo
 
-# add inigo lib
-COPY libs /kong/plugins/inigo
-
 # Ensure kong user is selected for image execution
 USER kong
 
