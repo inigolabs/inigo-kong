@@ -1,5 +1,5 @@
 # image is based on https://docs.konghq.com/gateway/latest/plugin-development/distribution/#via-a-dockerfile-or-docker-run-install-and-load
-FROM kong/kong-gateway:3.7.0.0
+FROM --platform=${TARGETPLATFORM:-linux/amd64} kong/kong-gateway:3.7.0.0
 
 # Ensure any patching steps are executed as root user
 USER root
