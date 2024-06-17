@@ -8,7 +8,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-20.04
-    timeout-minutes: 400
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +25,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GIT_TOKEN }}
 
-      - name: Build and Push container image (router)
+      - name: Set image tag
+        run: |
+          TAG=$(git rev-parse --short HEAD)
+          echo "IMAGE_TAG"=$TAG >> $GITHUB_ENV
+
+      - name: Build and Push container image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -33,5 +38,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/inigolabs/inigo-kong/inigo-kong:${{ git rev-parse --short HEAD }}
-            ghcr.io/inigolabs/inigo-kong/inigo-kong:latest
+            ghcr.io/inigolabs/inigo-kong/kong:${{ env.IMAGE_TAG }}
+            ghcr.io/inigolabs/inigo-kong/kong:latest

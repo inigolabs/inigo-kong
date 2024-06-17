@@ -35,7 +35,7 @@ inigo-linux-amd64.so -> inigo-kong/libs/inigo_linux_amd64/libinigo.so
 inigo-darwin-amd64.dylib -> inigo-kong/libs/inigo_darwin_amd64/libinigo.dylib
 ```
 
-2. Build Docker image - ```docker build -t <put-your-tag> .```
+2. Build Docker image - ```docker build -f ./Dockerfile-inigo -t <put-your-tag> .```
 3. Obtain installation script from Kong Konnect, substitute kong docker image with the newly built one
 4. Add `INIGO_SERVICE_TOKEN` env var (get it from app.inigo.io)
 5. Add 'inigo' plugin to Kong Konnect and enable it
