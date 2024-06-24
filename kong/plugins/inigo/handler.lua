@@ -27,8 +27,6 @@ ffi.cdef[[
   extern GoUint8 update_schema(GoUintptr handlePtr, char* input, GoInt input_len);
 
   extern void disposeHandle(GoUintptr handlePtr);
-
-  void *malloc(size_t);
 ]]
 
 local inigo = {
@@ -123,20 +121,12 @@ function inigo:access(plugin_conf)
   local body = ffi.cast("char*", req_body)
   local body_len = ffi.cast("GoInt", #req_body)
 
-  -- output and status
-  local typechar_ptr = ffi.typeof("char**")
-  local typechar_ptr_size = ffi.sizeof(typechar_ptr)
-
-  local typeint_ptr = ffi.typeof("GoInt*")
-  local typeint_ptr_size = ffi.sizeof(typeint_ptr)
-
-  local output = ffi.cast(typechar_ptr, ffi.C.malloc(typechar_ptr_size))
-  local output_len = ffi.cast(typeint_ptr, ffi.C.malloc(typeint_ptr_size))
-  local status = ffi.cast(typechar_ptr, ffi.C.malloc(typechar_ptr_size))
-  local status_len = ffi.cast(typeint_ptr, ffi.C.malloc(typeint_ptr_size))
-
-  local output_size_before = tonumber(output_len[0])
-  local status_size_before = tonumber(status_len[0])
+  -- output
+  local output = ffi.new("char*[1]")
+  local output_len = ffi.new("GoInt[1]")
+  -- status
+  local status = ffi.new("char*[1]")
+  local status_len = ffi.new("GoInt[1]")
 
   kong.request.instance = self.libinigo.process_service_request(
     self.handle_ptr,
@@ -149,14 +139,14 @@ function inigo:access(plugin_conf)
 
   -- mutate request : if request is mutated by Inigo
   local status_size = tonumber(status_len[0])
-  if status_size ~= status_size_before then
+  if status_size ~= 0 then
     local status_str = ffi.string(status[0], status_size) -- luacheck: no unused
     -- TODO: mutate request
   end
 
   -- block request : if response is provided by Inigo
-  local output_size= tonumber(output_len[0])
-  if output_size ~= output_size_before then
+  local output_size = tonumber(output_len[0])
+  if output_size ~= 0 then
     local output_str = ffi.string(output[0], output_size)
     kong.response.exit(200, output_str)
   end
@@ -187,16 +177,8 @@ function inigo:body_filter(plugin_conf)
   local body_len = ffi.cast("GoInt", tostring(resp_body):len())
 
   -- output : response
-  local typechar_ptr = ffi.typeof("char**")
-  local typechar_ptr_size = ffi.sizeof(typechar_ptr)
-  local response = ffi.cast(typechar_ptr, ffi.C.malloc(typechar_ptr_size))
-
-  -- output : response_len
-  local typeint_ptr = ffi.typeof("GoInt*")
-  local typeint_ptr_size = ffi.sizeof(typeint_ptr)
-  local response_len = ffi.cast(typeint_ptr, ffi.C.malloc(typeint_ptr_size))
-
-  local response_len_before = tonumber(response_len[0])
+  local response = ffi.new("char*[1]")
+  local response_len = ffi.new("GoInt[1]")
 
   self.libinigo.process_response(
     self.handle_ptr,
@@ -206,7 +188,7 @@ function inigo:body_filter(plugin_conf)
   )
 
   local resp_size = tonumber(response_len[0])
-  if response_len_before ~= resp_size then
+  if resp_size ~= 0 then
     local raw_body = ffi.string(response[0], resp_size)
     kong.response.set_raw_body(raw_body)
   end
