@@ -95,8 +95,9 @@ function inigo:init_worker()
 
   -- create Inigo instance
   self.handle_ptr = self.libinigo.create(cfg)
-  if not self.handle_ptr then
-    kong.log.err("init_worker : create failed:", ffi.string(self.libinigo.check_lasterror()))
+  local agent_create_err = ffi.string(self.libinigo.check_lasterror())
+  if agent_create_err ~= "" then
+    kong.log.err("init_worker : create failed - ", agent_create_err)
   end
 
   kong.log.debug("init_worker : end")
