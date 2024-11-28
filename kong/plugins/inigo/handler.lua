@@ -78,38 +78,72 @@ local base_path = os.getenv("INIGO_LIB_BASE_PATH") or "/"
 local full_path = base_path .. "kong/plugins/inigo/" .. lib_path
 kong.log.debug("inigo : inigo lib path - ", full_path, ", os - ", ffi.os, ", arch - ", ffi.arch)
 
-local token = os.getenv("INIGO_SERVICE_TOKEN")
+-- read and store all env vars that starts with INIGO_ prefix
 
--- create Inigo instance (after the worker process has been forked)
-function inigo:init_worker()
-  kong.log.debug("init_worker : start")
+-- read all env vars
+local handle = io.popen("env")
+local env = handle:read("*a")
+handle:close()
 
-  -- create config
-  local cfg = ffi.typeof("Config")()
-  cfg.token = ffi.cast("char*", token)
-  cfg.name = ffi.cast("char*", "kong ".. kong.version)
-  cfg.runtime = ffi.cast("char*", string.lower(_VERSION))
+-- create store for env vars prefixed with INIGO_
+local inigo_vars = {}
 
-  -- load lib
+for line in env:gmatch("[^\r\n]+") do
+  local key, value = line:match("^(.-)=(.+)$")
+  if key and value and key:match("^" .. "INIGO_") ~= nil then
+    inigo_vars[key] = value
+  end
+end
+
+function inigo:configure(configs)
+  kong.log.debug("configure : start")
+
+  -- load Inigo lib
   self.libinigo = ffi.load(full_path)
 
-  -- create Inigo instance
-  self.handle_ptr = self.libinigo.create(cfg)
-  local agent_create_err = ffi.string(self.libinigo.check_lasterror())
-  if agent_create_err ~= "" then
-    kong.log.err("init_worker : create failed - ", agent_create_err)
+  -- create a table that will be populated with Inigo handlers for different Inigo services (as configured per route)
+  self.inigo_agents = {}
+
+  -- iterate over all routes and create as many inigo instances as there are unique env variable names mentioned
+  for i = 1, #configs do
+    local token_env_name = configs[i].service_token_env_variable_name
+    local instance = self.inigo_agents[token_env_name]
+    if not instance then
+
+      local token = inigo_vars[token_env_name]
+      if not token then
+        kong.log.err("configure : env variable ", token_env_name, " is not found, but provided in the config")
+      else
+        kong.log.debug("configure : creating Inigo instance with ", token_env_name, " token")
+
+        -- create Inigo config (all Inigo services share the same env variables except the token)
+        local cfg = ffi.typeof("Config")()
+        cfg.name = ffi.cast("char*", "kong ".. kong.version)
+        cfg.runtime = ffi.cast("char*", string.lower(_VERSION))
+        cfg.token = ffi.cast("char*", token)
+
+        -- create Inigo instance
+        self.inigo_agents[token_env_name] = self.libinigo.create(cfg)
+        local agent_create_err = ffi.string(self.libinigo.check_lasterror())
+        if agent_create_err ~= "" then
+          kong.log.err("configure : create failed - ", agent_create_err)
+        end
+      end
+    end
   end
 
-  kong.log.debug("init_worker : end")
+  kong.log.debug("configure : end")
 end
 
 -- process request
 function inigo:access(plugin_conf)
+  kong.log.debug("process_request : start")
+
+  self.handle_ptr = self.inigo_agents[plugin_conf.service_token_env_variable_name]
   if not self.handle_ptr then
+    kong.log.err("process_request : inigo instance not found")
     return
   end
-
-  kong.log.debug("process_request : start")
 
   -- headers
   local req_headers = kong.request.get_headers()

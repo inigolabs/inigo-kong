@@ -11,9 +11,17 @@ local schema = {
 
     -- plugin specific configuration (configuration description that will appear in the Kong Konnect UI)
     { config = {
-        type = "record",
-        fields = {},
-        entity_checks = {},
+      type = "record",
+      fields = {
+        {
+          service_token_env_variable_name = {
+            type = "string",
+            required = true,
+            starts_with = "INIGO_"
+          }
+        }
+      },
+      entity_checks = {},
       },
     },
   },
