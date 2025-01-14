@@ -32,7 +32,7 @@ ffi.cdef[[
 local inigo = {
   -- priority determines plugin execution order, see https://docs.konghq.com/gateway/3.7.x/plugin-development/custom-logic/#plugins-execution-order
   PRIORITY = 1000,
-  VERSION = "0.30.3",
+  VERSION = "0.30.20",
 }
 
 local function getArch()
@@ -78,38 +78,76 @@ local base_path = os.getenv("INIGO_LIB_BASE_PATH") or "/"
 local full_path = base_path .. "kong/plugins/inigo/" .. lib_path
 kong.log.debug("inigo : inigo lib path - ", full_path, ", os - ", ffi.os, ", arch - ", ffi.arch)
 
-local token = os.getenv("INIGO_SERVICE_TOKEN")
-
--- create Inigo instance (after the worker process has been forked)
-function inigo:init_worker()
-  kong.log.debug("init_worker : start")
-
-  -- create config
-  local cfg = ffi.typeof("Config")()
-  cfg.token = ffi.cast("char*", token)
-  cfg.name = ffi.cast("char*", "kong ".. kong.version)
-  cfg.runtime = ffi.cast("char*", string.lower(_VERSION))
-
-  -- load lib
-  self.libinigo = ffi.load(full_path)
-
-  -- create Inigo instance
-  self.handle_ptr = self.libinigo.create(cfg)
-  local agent_create_err = ffi.string(self.libinigo.check_lasterror())
-  if agent_create_err ~= "" then
-    kong.log.err("init_worker : create failed - ", agent_create_err)
+function inigo:configure(configs)
+  -- to avoid nil-value error when Kong attempts to use local declarative configuration first and that one is not provided
+  if configs == nil then
+      return
   end
 
-  kong.log.debug("init_worker : end")
+  kong.log.debug("configure : start")
+
+  -- load Inigo lib
+  self.libinigo = ffi.load(full_path)
+
+  -- create a table that will be populated with Inigo handlers for different Inigo services (as configured per route)
+  self.inigo_agents = {}
+
+  -- iterate over all routes and create inigo instances for each unique token value
+  for i = 1, #configs do
+    local token_raw = configs[i].token
+    local token;
+
+    if kong.vault.is_reference(token_raw) then
+      local value, err = kong.vault.get(token_raw)
+      if err ~= nil then
+        kong.log.err("configure : cannot read token from vault by path ", token_raw, ", err : ", err)
+        return
+      end
+
+      kong.log.debug("configure : token is taken from vault by path ", token_raw)
+      token = value
+    else
+      token = token_raw;
+    end
+
+    local instance = self.inigo_agents[token_raw]
+    if not instance then
+      kong.log.debug("configure : creating Inigo instance")
+
+      -- create Inigo config (all Inigo services share the same env variables except the token)
+      local cfg = ffi.typeof("Config")()
+      cfg.name = ffi.cast("char*", "kong "..kong.version.."\0")
+      cfg.runtime = ffi.cast("char*", string.lower(_VERSION).."\0")
+
+      cfg.token = ffi.cast("char*", token)
+
+      -- supply schema if provided
+      local schema = configs[i].schema
+      if schema ~= nil then
+        cfg.schema = ffi.cast("char*", schema)
+      end
+
+      -- create Inigo instance
+      self.inigo_agents[token_raw] = self.libinigo.create(cfg)
+      local agent_create_err = ffi.string(self.libinigo.check_lasterror())
+      if agent_create_err ~= "" then
+        kong.log.err("configure : create failed - ", agent_create_err)
+      end
+    end
+  end
+
+  kong.log.debug("configure : end")
 end
 
 -- process request
 function inigo:access(plugin_conf)
+  kong.log.debug("process_request : start")
+
+  self.handle_ptr = self.inigo_agents[plugin_conf.token]
   if not self.handle_ptr then
+    kong.log.err("process_request : inigo instance not found")
     return
   end
-
-  kong.log.debug("process_request : start")
 
   -- headers
   local req_headers = kong.request.get_headers()
@@ -141,8 +179,8 @@ function inigo:access(plugin_conf)
   -- mutate request : if request is mutated by Inigo
   local status_size = tonumber(status_len[0])
   if status_size ~= 0 then
-    local status_str = ffi.string(status[0], status_size) -- luacheck: no unused
-    -- TODO: mutate request
+    local status_str = ffi.string(status[0], status_size)
+    kong.service.request.set_raw_body(status_str)
   end
 
   -- block request : if response is provided by Inigo

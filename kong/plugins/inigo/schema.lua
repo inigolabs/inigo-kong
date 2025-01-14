@@ -9,10 +9,25 @@ local schema = {
     -- this plugin will only run within Nginx HTTP module
     { protocols = typedefs.protocols_http },
 
-    -- plugin specific configuration (configuration description that will appear in the Kong Konnect UI)
+    -- plugin specific configuration
     { config = {
         type = "record",
-        fields = {},
+        fields = {
+          {
+            token = {
+              type = "string",
+              description = "Inigo service token. Check out https://docs.inigo.io/ to setup a service and a token.",
+              required = true
+            }
+          },
+          {
+            schema = {
+              type = "string",
+              description = "GraphQL schema of the endpoint. If not provided, Inigo Plugin will pull it from the cloud.",
+              required = false
+            }
+          }
+        },
         entity_checks = {},
       },
     },
