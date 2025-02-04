@@ -187,6 +187,10 @@ function inigo:access(plugin_conf)
   local output_size = tonumber(output_len[0])
   if output_size ~= 0 then
     local output_str = ffi.string(output[0], output_size)
+
+    self.libinigo.disposeHandle(kong.request.instance)
+    kong.request.instance = nil -- avoid further processing by Inigo
+
     kong.response.exit(200, output_str)
   end
 
