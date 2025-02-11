@@ -8,7 +8,7 @@ ffi.cdef[[
   typedef unsigned char GoUint8;
 
   typedef struct Config {
-    int8_t debug; // depracate
+    int8_t logLevel;
     char* name;
     char* service;
     char* token;
@@ -78,6 +78,16 @@ local base_path = os.getenv("INIGO_LIB_BASE_PATH") or "/"
 local full_path = base_path .. "kong/plugins/inigo/" .. lib_path
 kong.log.debug("inigo : inigo lib path - ", full_path, ", os - ", ffi.os, ", arch - ", ffi.arch)
 
+-- LOG_LEVELS mapping to indexes as they are defined in Inigo
+local LOG_LEVELS = {
+    ["debug"]   = 2,
+    ["info"]    = 3,
+    ["notice"]  = 4,
+    ["warn"]    = 5,
+    ["error"]   = 6,
+    ["crit"]    = 8,
+}
+
 function inigo:configure(configs)
   -- to avoid nil-value error when Kong attempts to use local declarative configuration first and that one is not provided
   if configs == nil then
@@ -116,6 +126,7 @@ function inigo:configure(configs)
 
       -- create Inigo config (all Inigo services share the same env variables except the token)
       local cfg = ffi.typeof("Config")()
+      cfg.logLevel = LOG_LEVELS[kong.configuration.log_level]
       cfg.name = ffi.cast("char*", "kong "..kong.version.."\0")
       cfg.runtime = ffi.cast("char*", string.lower(_VERSION).."\0")
 
